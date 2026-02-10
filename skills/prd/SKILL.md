@@ -1,6 +1,6 @@
 ---
 name: prd
-description: "Generate a Product Requirements Document (PRD) for a new feature, task, or experiment. Use during the planning, starting a new project, refactoring, code testing, or simply when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, plan the experiment, plan the refactoring, write requirements for, spec out, etc."
+description: "Generate a Product Requirements Document (PRD) for a new feature, task, experiment or research. Use during the planning, starting a new project, refactoring, developing research code, code testing, or simply when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, plan the experiment, plan the refactoring, write requirements for, spec out, etc."
 ---
 
 # PRD Generator
@@ -12,13 +12,13 @@ Create detailed PRD that is clear, actionable, and suitable for implementation.
 ## The Job
 
 1. Receive a task description from the user
-2. Ask 3 to 5 essential clarifying questions (with lettered options)
+2. Ask 3 to 5 essential clarifying questions (with lettered options) if necessary
 3. Generate a structured PRD based on answers
-4. Save to `tasks/prd-[feature-name].md`
+4. Save to `PRD.md` if user doesn't tell you differently.
 
 **Important:**
-- Do NOT implement code
-- Keep your focus on planning, structure, and evaluation
+- DO NOT implement code
+- Keep your focus on PLANNING, STRUCTURE, and EVALUATION
 
 ---
 
@@ -132,7 +132,9 @@ Template C: Refactoring / Testing
 - [ ] Type hints added/updated where applicable
 ```
 
-**Important:** Acceptance criteria must be **verifiable**, not subjective.
+**Important:**
+- Acceptance criteria must be **verifiable**, not subjective.
+- Each use story has to be **stand alone**, and it should be possible to solve it with a fresh context.
 
 ### 5. Functional Requirements
 Explicit, numbered requirements describing **what the code must solve**.
@@ -371,8 +373,8 @@ Therefore:
 ## Output
 
 - **Format:** Markdown (`.md`)
-- **Location:** `tasks/`
-- **Filename:** `prd-[feature-or-project-or-task-name].md` (kebab-case)
+- **Location:** `.`
+- **Filename:** `PRD.md`
 
 ---
 
@@ -385,4 +387,4 @@ Before saving the PRD:
 - [ ] Stories are small and specific
 - [ ] Functional requirements are numbered and unambiguous
 - [ ] Non-goals section defines clear boundaries
-- [ ] Saved to `prd-[feature-or-project-or-task-name].md`
+- [ ] Saved to `PRD.md`

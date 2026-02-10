@@ -1,17 +1,17 @@
 ---
 name: spec
-description: "Convert Product Requirement Document (PRD) into a specification document - a set of user stories. Use when you have an existing PRD and need to create a task list for autonomous coding. Triggers on: convert this prd, create plan from prd, create spec from prd, turn prd into tasks."
+description: "Write a specification document - a set of user stories. Either written from scratch (with user input or PLAN.md) or translated from an existing PRD and need to create a task list for autonomous coding. Triggers on: write the spec, convert this plan, create specification from plan, convert this prd, create specification from prd, create spec from prd, turn prd into tasks."
 ---
 
-# User-Story Converter
+# SPECIFICATION DOCUMENT
 
-Converts existing PRDs into `SPEC.md` - a structured user-story list that autonomous agents can execute.
+Either written from scratch or converted from existing PRDs into `SPEC.md` - a structured user-story list that autonomous agents can execute.
 
 ---
 
 ## The Job
 
-Take a PRD (markdown file from `tasks/` or `/docs` directory) and convert it to `spec.md` in the project root.
+Write from scratch (use user's input and/or PLAN) or take a PRD (usually markdown file PRD.md in the project root if not specified differently) and convert it to `SPEC.md` in the project root.
 
 ---
 
@@ -20,9 +20,10 @@ Take a PRD (markdown file from `tasks/` or `/docs` directory) and convert it to 
 Find the PRD to convert:
 
 1. If user specifies a file path, use that
-2. Otherwise, look in `tasks/` or `/docs` for files matching `prd-*.md`
+2. Otherwise, look for the `PRD.md` in the root directory
 3. If multiple PRDs exist, ask which one to convert
-4. Read the entire PRD content
+4. If no PRD exists, ask user how to proceed with writing the specification
+5. Read the entire PRD content or act accordingly with the user's input
 
 ---
 
@@ -114,8 +115,6 @@ Save the output to `SPEC.md` in the project root.
 ## Overview
 [Brief description extracted from PRD Introduction/Overview]
 
-**Reference:** `tasks/prd-[feature-name].md` or `docs/prd-[feature-name].md`
-
 ---
 
 ## Task List
@@ -165,7 +164,7 @@ Save the output to `SPEC.md` in the project root.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `category` | string | One of: `setup`, `feature`, `refactor`, `testing`, `docs` |
+| `category` | string | One of: `setup`, `research`, `feature`, `refactor`, `testing`, `docs` |
 | `id` | string | From PRD user story ID, or generate as `US-1`, `US-2`, etc. |
 | `title` | string | Exact title from PRD user story |
 | `description` | string | The "As a... I want... so that..." from PRD user story |
@@ -201,6 +200,7 @@ For example, if a fresh Claude instance is spawned per iteration with no memory 
 Tasks execute per priority order. Earlier tasks must NOT depend on later ones.
 
 **Correct order:**
+0. OPTIONAL: Research 
 1. Configuration and schema changes
 2. Core logic and data processing
 3. Higher-level functions that use core logic
@@ -240,7 +240,7 @@ Each step must be something the agent can CHECK, not something vague.
 
 ## Example Conversion
 
-### Input PRD (`tasks/prd-early-stopping.md`):
+### Input PRD:
 
 ```markdown
 # PRD: Early Stopping for Training Pipeline
@@ -300,7 +300,7 @@ The training pipeline currently runs for a fixed number of epochs, wasting compu
 ## Overview
 Add early stopping to the training pipeline based on validation loss to reduce compute waste when the model has converged.
 
-**Reference:** `tasks/prd-early-stopping.md`
+**Reference:** `PRD.md`
 
 ---
 
@@ -365,8 +365,6 @@ Add early stopping to the training pipeline based on validation loss to reduce c
 ]
 ```
 
----
-
 ## Notes
 
 **Linting:**
@@ -388,11 +386,12 @@ uv run pytest tests/
 ```bash
 uv run python train.py --config config.yaml
 ```
+
 ```
 
 ---
 
-## Checklist Before Saving
+## Final Checklist Before Saving
 
 Before writing SPEC.md, verify:
 
