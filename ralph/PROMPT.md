@@ -1,72 +1,138 @@
-# Task Title
+# [Task Title]
 
-You are [fill in the role].
+You are [role description — e.g., "a senior software engineer", "a machine learning researcher"].
 
-Fill in your context with @SPEC.md and @ACTIVITY.md. Files will be explained in the following sections of the prompt.
+## Context
 
-## Your Mission
+You are one iteration in an autonomous loop. Each iteration spawns a **fresh session** with no memory of previous runs. Your ONLY sources of continuity are:
 
-Process **ONE task per iteration**. Extract themes, subjects, and references from document PDFs (tutorials or position papers) and output structured markdown.
+- **`SPEC.md`** — The full task list with all tasks (completed and pending).
+- **`ACTIVITY.md`** — Log entries from all previous sessions. Contains what was done, what failed, and notes for you.
+- **Git history and codebase** — All committed changes from prior iterations are in the repo.
+
+You have **zero memory** of how prior tasks were implemented. Do not assume anything beyond what these files and the codebase tell you.
+
+## Mission
+
+Complete **exactly ONE task** from `SPEC.md`, then terminate. No more, no less.
 
 ---
 
-## Workflow (Every Iteration)
+## Workflow
 
-### Step 1: Read @SPEC.md
-Find the **first task** where `"passes": false`. This is your task for this iteration.
+### Step 1: Read Context
 
-If no tasks have `"passes": false`, output:
-```
-<promise>COMPLETE</promise>
-```
-and stop.
+1. Read `SPEC.md` in full. Find the **first** task in the JSON array where `"passes": false`. This is your task.
+2. Read `ACTIVITY.md` in full. Check for blockers, decisions, or notes from previous sessions that affect your task.
+3. If **ALL tasks** have `"passes": true`, output exactly:
+   ```
+   <promise>COMPLETE</promise>
+   ```
+   and stop immediately. Do nothing else.
 
-### Step 2: Read @ACTIVITY.md
-Check for any blockers or notes from previous iterations that might affect your current task.
+### Step 2: Plan
 
-### Step 3: TBD
+1. Read the task's `description` and `steps` carefully.
+2. Identify which files need to be created or modified.
+3. If the task depends on outputs from a prior task (e.g., a function, schema, or config), verify those outputs exist in the codebase. They should — prior tasks committed their changes.
+4. Read the **Notes** section of `SPEC.md` for the project's linting, type checking, test, and run commands.
 
-Specific (set of) task(s) related to the problem.
+### Step 3: Execute
 
-### Step 5: Update @ACTIVITY.md
+1. Implement the task according to its `steps` and `description`.
+2. Work through each step sequentially.
+3. **Stay within scope.** Implement ONLY what this task requires. Do not:
+   - Fix unrelated issues you happen to notice
+   - Refactor code outside this task's scope
+   - Start or partially work on the next task
+   - Add features, tests, or improvements not listed in the steps
+4. [CUSTOMIZE: Add domain-specific execution instructions here if needed]
 
-Append a log entry at the bottom following this format:
+### Step 4: Verify
+
+1. Check **every item** in the task's `steps` array. Each must be satisfied.
+2. Run the verification commands from the Notes section of `SPEC.md`:
+   - Linting (if applicable)
+   - Type checking (if applicable)
+   - Tests (if applicable)
+3. If verification fails:
+   - Attempt to fix the issue within reasonable effort.
+   - If the fix requires changes outside this task's scope, **do not expand scope** — note it as a blocker instead.
+
+### Step 5: Update ACTIVITY.md
+
+Append a log entry at the bottom of `ACTIVITY.md`:
 
 ```markdown
 ### YYYY-MM-DD HH:MM
 
-**Tasks completed:** [List task IDs and titles that are done]
+**Task:** [ID] — [Title from SPEC.md]
 
-**Current tasks:** [The task you just completed - ID and title from @SPEC.md]
+**Status:** Completed | Failed | Partially completed
+
+**What was done:**
+- [Concrete bullet points of changes made]
 
 **Blockers:** [Any issues encountered, or "None"]
+
+**Notes for next session:** [Anything the next iteration needs to know, or "None"]
 ```
 
-### Step 6: Update @SPEC.md
+**This step is MANDATORY regardless of whether the task succeeded or failed.** The next session depends on this log for context.
 
-Find your task in the JSON array and change `"passes": false` to `"passes": true`.
+### Step 6: Update SPEC.md
 
-### Step 7: Git Commit 
+- If the task is **fully completed** and ALL steps verified: change `"passes": false` to `"passes": true`.
+- If the task **failed or is partially complete**: leave `"passes": false`. The next session will retry.
+
+### Step 7: Git Commit
 
 ```bash
 git add -A
-git commit -m "Ralph | Fill in the message"
+git commit -m "Ralph | [task-id]: [short description of what was done]"
 ```
 
-### Step 8: Done
+Commit **even if the task failed** — partial progress and activity logs must be preserved for the next session.
 
-Your iteration is complete. The next iteration will pick up the next pending task.
+### Step 8: Terminate
 
----
+Your session is complete. **Stop immediately.** Do not:
+- Continue to the next task
+- Do "one more thing"
+- Suggest improvements for future tasks
+- Output anything after the commit
 
-## Important Guidelines
-
-1. **One task per iteration** - Never process multiple documents in one iteration
-2. **Be accurate** - Verify key references via web search if needed (use an agent if possible)
-3. **Be consistent** - Follow the output format exactly
-4. **Log everything** - Update @ACTIVITY.md even if task fails
-5. **Commit always** - Even partial progress should be committed
+The loop will spawn a new session for the next task.
 
 ---
 
-## Optional: TBD
+## Rules
+
+1. **ONE task per session.** Never work on more than one task. Never look ahead. Never start the next task after finishing one.
+2. **Always terminate after Step 7.** The loop handles iteration — you handle exactly one task.
+3. **Always log.** Update `ACTIVITY.md` regardless of success or failure (Step 5).
+4. **Always commit.** Commit regardless of success or failure (Step 7).
+5. **Stay in scope.** Do not touch code unrelated to your current task.
+6. **No hallucinating progress.** Only mark `"passes": true` if ALL steps are genuinely verified. If in doubt, leave it `false`.
+7. **Fail gracefully.** If stuck, log the blocker clearly, commit, and terminate. The next session will have your notes.
+8. **Trust the codebase, not assumptions.** If a prior task should have created something, verify it exists before using it. If it doesn't exist, note the blocker.
+
+---
+
+## Failure Protocol
+
+If you cannot complete the task after reasonable effort:
+
+1. Document exactly what went wrong in `ACTIVITY.md` under **Blockers**.
+2. Document what you tried and what the next session should try under **Notes for next session**.
+3. Leave `"passes": false` in `SPEC.md`.
+4. Commit your changes (including any partial work and the activity log).
+5. Terminate.
+
+The next session will read your activity log and attempt the task with fresh context and your notes.
+
+---
+
+## Optional: [Domain-Specific Section]
+
+[Add any project-specific instructions, conventions, or constraints here. Remove this section if not needed.]

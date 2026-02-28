@@ -5,22 +5,28 @@ description: "Write a specification document - a set of user stories. Either wri
 
 # SPECIFICATION DOCUMENT
 
-Either written from scratch or converted from existing PRDs into `SPEC.md` - a structured user-story list that autonomous agents can execute.
+Either written from scratch or converted from existing PRDs into `SPEC.md` — a structured task list that autonomous agents execute one task at a time, each in an isolated session with no shared memory.
 
 ---
 
 ## The Job
 
-Write from scratch (use user's input and/or PLAN) or take a PRD (usually markdown file PRD.md in the project root if not specified differently) and convert it to `SPEC.md` in the project root.
+Write from scratch (use user's input and/or PLAN) or take a PRD (usually `PRD.md` in the project root) and convert it to `SPEC.md` in the project root.
+
+**Key constraint:** Each task in the spec will be executed by a fresh agent session that has ONLY these sources of context:
+- The full `SPEC.md` file
+- An `ACTIVITY.md` log from previous sessions
+- The `PROMPT.md` instructions
+- The git history and current codebase
+
+The agent has **no memory** of how prior tasks were implemented. Tasks must be sovereign — fully self-contained and solvable in isolation.
 
 ---
 
 ## Step 1: Locate the Source PRD
 
-Find the PRD to convert:
-
 1. If user specifies a file path, use that
-2. Otherwise, look for the `PRD.md` in the root directory
+2. Otherwise, look for `PRD.md` in the root directory
 3. If multiple PRDs exist, ask which one to convert
 4. If no PRD exists, ask user how to proceed with writing the specification
 5. Read the entire PRD content or act accordingly with the user's input
@@ -41,13 +47,32 @@ Check that the PRD contains the required sections:
 - Success Metrics
 
 **If validation fails:**
-- Missing User Stories AND Functional Requirements → Stop and ask user to complete the PRD
-- Missing Introduction → Use the PRD title/filename as description
+- Missing User Stories AND Functional Requirements -> Stop and ask user to complete the PRD
+- Missing Introduction -> Use the PRD title/filename as description
 - Warn about missing optional sections but continue
 
 ---
 
-## Step 3: Extract and Convert Tasks
+## Step 3: Discover Project Commands
+
+Before writing the SPEC, inspect the project to determine the correct commands for linting, type checking, testing, and running. Check these sources:
+
+- `pyproject.toml` — look for `[tool.ruff]`, `[tool.ty]`, `[tool.pytest]`, `[project.scripts]`
+- `Makefile` — targets like `lint`, `test`, `check`, `run`
+- `.github/workflows/*.yml` — CI steps often reveal the canonical commands
+- `README.md` — often documents how to run, test, and lint
+
+Defaults (when using `uv`):
+- Linting: `uv run ruff check .`
+- Type checking: `uv run ty src/`
+- Tests: `uv run pytest tests/`
+- Run: `uv run python main.py`
+
+If you cannot determine a command, use a placeholder: `# TODO: determine [linting/test/...] command`.
+
+---
+
+## Step 4: Extract and Convert Tasks
 
 Transform PRD content into tasks:
 
@@ -61,19 +86,23 @@ Transform PRD content into tasks:
 | Code restructuring, cleanup | `refactor` |
 | Test writing, coverage improvement | `testing` |
 | Documentation, README updates | `docs` |
+| Database or system migrations | `migration` |
+| Integration with external services | `integration` |
+
+If a task does not fit any category, use the closest match and note it in the task description.
 
 ### Conversion Process
 
 For each User Story in the PRD:
-1. Extract or generate the ID → becomes `id` (e.g., `US-1`, `US-2`, or use PRD's ID if present)
-2. Extract the title → becomes `title`
-3. Extract the description → becomes `description`
-4. Extract acceptance criteria → becomes `steps` array
+1. Extract or generate the ID -> becomes `id` (e.g., `US-1`, `US-2`, or use PRD's ID if present)
+2. Extract the title -> becomes `title`
+3. Extract the description -> becomes `description`
+4. Extract acceptance criteria -> becomes `steps` array
 5. Determine category from context and priority
 6. Add appropriate verification step as final step (see below)
 7. Set `passes: false`
 
-**Field Mapping from PRD User Stories:**
+**Field Mapping:**
 
 | PRD User Story Field | Task Field |
 |---------------------|------------|
@@ -101,19 +130,27 @@ For Functional Requirements without User Stories:
 
 ---
 
-## Step 4: Write SPEC.md
+## Step 5: Write SPEC.md
 
 Save the output to `SPEC.md` in the project root.
+
+**JSON validity is critical.** The task list is parsed by automation. Before saving, verify:
+- Every string is properly quoted
+- No trailing commas after the last element in arrays or objects
+- All special characters in strings are escaped (`\"`, `\\`)
+- The JSON array is syntactically valid
 
 ---
 
 ## Output Format
 
-```markdown
+````markdown
 # Project Plan
 
 ## Overview
 [Brief description extracted from PRD Introduction/Overview]
+
+**Reference:** `PRD.md`
 
 ---
 
@@ -142,54 +179,71 @@ Save the output to `SPEC.md` in the project root.
 
 **Linting:**
 ```bash
-# Command to run linting (e.g., uv run ruff check ., npm run lint)
+uv run ruff check .
 ```
 
 **Type checking:**
 ```bash
-# Command to run type checking (e.g., uv run mypy src/, npx tsc --noEmit)
+uv run ty src/
 ```
 
 **Tests:**
 ```bash
-# Command to run tests (e.g., uv run pytest tests/, npm test)
+uv run pytest tests/
 ```
 
 **Run:**
 ```bash
-# Command to run the project (e.g., uv run python main.py, npm start)
+uv run python main.py
 ```
+````
 
 ### Field Definitions
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `category` | string | One of: `setup`, `research`, `feature`, `refactor`, `testing`, `docs` |
+| `category` | string | One of: `setup`, `research`, `feature`, `refactor`, `testing`, `docs`, `migration`, `integration` |
 | `id` | string | From PRD user story ID, or generate as `US-1`, `US-2`, etc. |
 | `title` | string | Exact title from PRD user story |
 | `description` | string | The "As a... I want... so that..." from PRD user story |
 | `steps` | array | Ordered list derived from acceptance criteria + verification |
-| `passes` | boolean | Always `false` initially; Ralph marks `true` when complete |
+| `passes` | boolean | Always `false` initially; marked `true` when complete |
 
 ---
 
-## Task Sizing: The Critical Rule
+## Task Sovereignty: The Critical Rule
 
-**Each task must be completable within ONE context window.**
+**Each task must be solvable by a fresh agent that has never seen any prior session.**
 
-For example, if a fresh Claude instance is spawned per iteration with no memory of previous work, it should be able to do a single task. If a task is too big, the agent runs out of context before finishing and produces broken code.
+The executing agent receives:
+- The full SPEC.md (all tasks, including completed ones)
+- The ACTIVITY.md log (summaries of what prior sessions did)
+- The current codebase (with committed changes from prior tasks)
+- The PROMPT.md instructions
 
-### Right-sized tasks:
+It does NOT receive:
+- Memory of how prior tasks were implemented
+- The reasoning or decisions made during prior sessions
+- Any context beyond what is written in the files above
+
+### What this means for task writing
+
+1. **Never write "use the function from US-2"** — instead write "use the `load_dataset()` function from `src/data.py`" (the agent can find it in the codebase)
+2. **Never assume knowledge of implementation choices** — if a task depends on a config schema from a prior task, describe what the schema must contain
+3. **Each task's steps must be independently checkable** — the agent must be able to verify completion without running other tasks
+4. **Include file paths when possible** — "Add `patience` parameter to `src/config.py`" not "Add `patience` parameter to the config"
+
+### Right-sized tasks
 - Add a configuration parameter with validation
 - Implement a single function or method
 - Write tests for one module
 - Add logging to a pipeline stage
 - Create a data preprocessing step
 
-### Too big (split these):
-- "Build the entire pipeline" → Split into: config, data loading, processing stages, evaluation
-- "Add experiment tracking" → Split into: config schema, logging functions, metrics collection, output formatting
-- "Refactor the codebase" → Split into one task per module or pattern
+### Too big — split these
+- "Build the entire pipeline" -> Split into: config, data loading, processing stages, evaluation
+- "Add experiment tracking" -> Split into: config schema, logging functions, metrics collection, output formatting
+- "Refactor the codebase" -> Split into one task per module or pattern
 
 **Rule of thumb:** If you cannot describe the change in 2-3 sentences, split it.
 
@@ -197,10 +251,10 @@ For example, if a fresh Claude instance is spawned per iteration with no memory 
 
 ## Task Ordering: Dependencies First
 
-Tasks execute per priority order. Earlier tasks must NOT depend on later ones.
+Tasks are executed sequentially in the order they appear. Earlier tasks must NOT depend on later ones.
 
 **Correct order:**
-0. OPTIONAL: Research 
+0. OPTIONAL: Research
 1. Configuration and schema changes
 2. Core logic and data processing
 3. Higher-level functions that use core logic
@@ -217,20 +271,20 @@ Tasks execute per priority order. Earlier tasks must NOT depend on later ones.
 
 Each step must be something the agent can CHECK, not something vague.
 
-### Good steps (verifiable):
-- "Add `patience` parameter to config with default value 5"
-- "Implement `load_dataset()` function that returns DataFrame"
+**Good steps (verifiable):**
+- "Add `patience` parameter to `src/config.py` with default value 5"
+- "Implement `load_dataset()` function in `src/data.py` that returns a DataFrame"
 - "Log validation loss after each epoch to `metrics.json`"
-- "Raise ValueError when input shape doesn't match expected"
+- "Raise `ValueError` when input shape doesn't match expected"
 - "All tests pass"
 
-### Bad steps (vague):
+**Bad steps (vague):**
 - "Works correctly"
 - "Handles edge cases"
 - "Good performance"
 - "Clean implementation"
 
-### Always include appropriate verification:
+**Always include appropriate verification:**
 ```
 "Typecheck passes"
 "All tests pass"
@@ -294,7 +348,7 @@ The training pipeline currently runs for a fixed number of epochs, wasting compu
 
 ### Output (`SPEC.md`):
 
-```markdown
+````markdown
 # Project Plan
 
 ## Overview
@@ -314,8 +368,8 @@ Add early stopping to the training pipeline based on validation loss to reduce c
     "title": "Add early stopping configuration",
     "description": "As a researcher, I need configurable early stopping parameters",
     "steps": [
-      "Add patience parameter to config (default: 5)",
-      "Add min_delta parameter to config (default: 0.001)",
+      "Add patience parameter to src/config.py (default: 5)",
+      "Add min_delta parameter to src/config.py (default: 0.001)",
       "Ensure parameters are loadable from config file",
       "Typecheck passes"
     ],
@@ -327,7 +381,7 @@ Add early stopping to the training pipeline based on validation loss to reduce c
     "title": "Implement early stopping logic",
     "description": "As a researcher, I want training to stop when validation loss plateaus",
     "steps": [
-      "Create EarlyStopping class with patience and min_delta",
+      "Create EarlyStopping class in src/early_stopping.py with patience and min_delta parameters",
       "Track validation loss history across epochs",
       "Return stop signal when no improvement for patience epochs",
       "Log early stopping event with epoch number and final metrics",
@@ -341,8 +395,8 @@ Add early stopping to the training pipeline based on validation loss to reduce c
     "title": "Save best model checkpoint",
     "description": "As a researcher, I want the best model saved automatically",
     "steps": [
-      "Save checkpoint when validation loss improves",
-      "Include epoch number, validation loss, and config in checkpoint",
+      "Save checkpoint to checkpoints/ directory when validation loss improves",
+      "Include epoch number, validation loss, and config in checkpoint metadata",
       "Overwrite previous best checkpoint on improvement",
       "Typecheck passes"
     ],
@@ -365,6 +419,8 @@ Add early stopping to the training pipeline based on validation loss to reduce c
 ]
 ```
 
+---
+
 ## Notes
 
 **Linting:**
@@ -374,7 +430,7 @@ uv run ruff check .
 
 **Type checking:**
 ```bash
-uv run mypy src/
+uv run ty src/
 ```
 
 **Tests:**
@@ -386,8 +442,7 @@ uv run pytest tests/
 ```bash
 uv run python train.py --config config.yaml
 ```
-
-```
+````
 
 ---
 
@@ -395,13 +450,16 @@ uv run python train.py --config config.yaml
 
 Before writing SPEC.md, verify:
 
-- [ ] Source PRD has been fully read
+- [ ] Source PRD (or user input) has been fully read
 - [ ] Each task has `id`, `title`, and `description` from PRD user stories
-- [ ] Each task is completable in one iteration (small enough)
-- [ ] Tasks are ordered by priority (if same priority, select in the order written)
+- [ ] Each task is sovereign — solvable by a fresh agent with no memory of prior sessions
+- [ ] Each task is completable in one context window (small enough)
+- [ ] Tasks are ordered by priority (if same priority, keep the order from the PRD)
+- [ ] No task depends on a later task
 - [ ] Every task ends with appropriate verification step
 - [ ] All steps are verifiable (not vague)
-- [ ] No task depends on a later task
+- [ ] Steps include file paths where applicable
 - [ ] Overview accurately summarizes the PRD
 - [ ] Reference points to correct PRD file
-- [ ] Notes section includes project-specific commands for linting, type checking, tests, and running
+- [ ] Notes section includes project-specific commands discovered from the codebase
+- [ ] JSON is syntactically valid (no trailing commas, all strings quoted, special chars escaped)

@@ -12,23 +12,33 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m' # No Color
 
-# Configuration
-PROMPT_FILE="ralph/PROMPT.md"
-PLAN_FILE="ralph/PLAN.md"
-SETTINGS_FILE=".claude/settings.local.json"
+# Configuration — override with environment variables if needed
+PROMPT_FILE="${RALPH_PROMPT_FILE:-PROMPT.md}"
+SPEC_FILE="${RALPH_SPEC_FILE:-SPEC.md}"
+ACTIVITY_FILE="${RALPH_ACTIVITY_FILE:-ACTIVITY.md}"
+SETTINGS_FILE="${RALPH_SETTINGS_FILE:-.claude/settings.local.json}"
+LOCKFILE=".ralph.lock"
+DELAY_BETWEEN_ITERATIONS="${RALPH_DELAY:-3}"
 
 usage() {
   echo "Usage: $0 <iterations>"
   echo ""
-  echo "Runs Claude autonomously to complete tasks defined in PLAN.md."
+  echo "Runs Claude autonomously to complete tasks defined in SPEC.md."
   echo "Each iteration completes one task until all are done or max iterations reached."
   echo ""
   echo "Prerequisites:"
   echo "  - claude CLI installed and in PATH"
   echo "  - jq installed (for context usage display)"
-  echo "  - $PROMPT_FILE in current directory"
-  echo "  - $PLAN_FILE with task definitions"
+  echo "  - $PROMPT_FILE with agent instructions"
+  echo "  - $SPEC_FILE with task definitions"
   echo "  - $SETTINGS_FILE with required permissions (recommended)"
+  echo ""
+  echo "Environment variables:"
+  echo "  RALPH_PROMPT_FILE    Path to prompt file (default: PROMPT.md)"
+  echo "  RALPH_SPEC_FILE      Path to spec file (default: SPEC.md)"
+  echo "  RALPH_ACTIVITY_FILE  Path to activity file (default: ACTIVITY.md)"
+  echo "  RALPH_SETTINGS_FILE  Path to settings file (default: .claude/settings.local.json)"
+  echo "  RALPH_DELAY          Seconds between iterations (default: 3)"
   exit 1
 }
 
@@ -37,16 +47,25 @@ format_duration() {
   local seconds=$1
   if [ "$seconds" -lt 60 ]; then
     echo "${seconds}s"
-  else
+  elif [ "$seconds" -lt 3600 ]; then
     local minutes=$((seconds / 60))
     local remaining_seconds=$((seconds % 60))
     echo "${minutes}m ${remaining_seconds}s"
+  else
+    local hours=$((seconds / 3600))
+    local minutes=$(( (seconds % 3600) / 60 ))
+    echo "${hours}h ${minutes}m"
   fi
 }
 
 # Get current timestamp
 timestamp() {
   date "+%Y-%m-%d %H:%M:%S"
+}
+
+# Cleanup function for signal handling and exit
+cleanup() {
+  rm -f "$LOCKFILE"
 }
 
 # Require iteration count
@@ -62,6 +81,8 @@ fi
 
 ITERATIONS=$1
 
+# ── Pre-flight checks ──────────────────────────────────────────────────
+
 # Check for claude CLI
 if ! command -v claude &> /dev/null; then
   echo -e "${RED}Error: claude CLI not found in PATH${NC}"
@@ -70,39 +91,87 @@ if ! command -v claude &> /dev/null; then
 fi
 
 # Check for jq (optional but recommended)
+HAS_JQ=true
 if ! command -v jq &> /dev/null; then
-  echo -e "${YELLOW}Warning: jq not found - context usage display will be unavailable${NC}"
+  echo -e "${YELLOW}Warning: jq not found — context usage display will be unavailable${NC}"
   echo -e "${YELLOW}Install jq for token usage statistics: brew install jq${NC}"
   echo ""
+  HAS_JQ=false
 fi
 
-# Check for PROMPT.md
-if [ ! -f "$PROMPT_FILE" ]; then
-  echo -e "${RED}Error: $PROMPT_FILE not found in current directory${NC}"
+# Check for git
+if ! command -v git &> /dev/null; then
+  echo -e "${RED}Error: git not found in PATH${NC}"
   exit 1
 fi
 
-# Check for PLAN.md and count incomplete tasks
-if [ ! -f "$PLAN_FILE" ]; then
-  echo -e "${YELLOW}Warning: $PLAN_FILE not found - cannot verify task count${NC}"
-  INCOMPLETE_TASKS=0
-else
-  # Count tasks where "passes": false
-  INCOMPLETE_TASKS=$(grep -c '"passes": false' "$PLAN_FILE" 2>/dev/null || echo "0")
+# Must be inside a git repo
+if ! git rev-parse --is-inside-work-tree &> /dev/null; then
+  echo -e "${RED}Error: not inside a git repository${NC}"
+  exit 1
+fi
 
-  if [ "$INCOMPLETE_TASKS" -gt 0 ] && [ "$ITERATIONS" -lt "$INCOMPLETE_TASKS" ]; then
-    echo -e "${YELLOW}Warning: $INCOMPLETE_TASKS incomplete task(s) in $PLAN_FILE, but only $ITERATIONS iteration(s) requested${NC}"
-    echo -e "${YELLOW}Not all tasks will be completed.${NC}"
-    echo ""
-    read -p "Continue anyway? [y/N] " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-      exit 1
-    fi
+# Lockfile — prevent concurrent Ralph instances
+if [ -f "$LOCKFILE" ]; then
+  LOCK_PID=$(cat "$LOCKFILE" 2>/dev/null || echo "")
+  if [ -n "$LOCK_PID" ] && kill -0 "$LOCK_PID" 2>/dev/null; then
+    echo -e "${RED}Error: another Ralph instance is running (PID $LOCK_PID)${NC}"
+    echo -e "${RED}If this is stale, remove $LOCKFILE manually.${NC}"
+    exit 1
+  else
+    echo -e "${YELLOW}Warning: stale lockfile found — removing${NC}"
+    rm -f "$LOCKFILE"
   fi
 fi
 
-# Warn if settings file is missing (permissions may block autonomous execution)
+# Register cleanup on exit and signals
+trap cleanup EXIT INT TERM
+echo $$ > "$LOCKFILE"
+
+# Check for PROMPT.md
+if [ ! -f "$PROMPT_FILE" ]; then
+  echo -e "${RED}Error: $PROMPT_FILE not found${NC}"
+  exit 1
+fi
+
+# Check for SPEC.md
+if [ ! -f "$SPEC_FILE" ]; then
+  echo -e "${RED}Error: $SPEC_FILE not found — generate it first (e.g., /spec)${NC}"
+  exit 1
+fi
+
+INCOMPLETE_TASKS=$(grep -c '"passes": false' "$SPEC_FILE" 2>/dev/null || echo "0")
+
+if [ "$INCOMPLETE_TASKS" -eq 0 ]; then
+  echo -e "${GREEN}All tasks in $SPEC_FILE are already complete. Nothing to do.${NC}"
+  exit 0
+fi
+
+if [ "$ITERATIONS" -lt "$INCOMPLETE_TASKS" ]; then
+  echo -e "${YELLOW}Warning: $INCOMPLETE_TASKS incomplete task(s) in $SPEC_FILE, but only $ITERATIONS iteration(s) requested${NC}"
+  echo -e "${YELLOW}Not all tasks will be completed.${NC}"
+  echo ""
+  read -p "Continue anyway? [y/N] " -n 1 -r
+  echo ""
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
+  fi
+fi
+
+# Warn about uncommitted changes — Ralph commits with `git add -A`
+if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+  echo -e "${YELLOW}Warning: uncommitted changes detected in the working tree${NC}"
+  echo -e "${YELLOW}Ralph commits with 'git add -A', which will include these changes.${NC}"
+  echo -e "${YELLOW}Consider committing or stashing your work first.${NC}"
+  echo ""
+  read -p "Continue anyway? [y/N] " -n 1 -r
+  echo ""
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
+  fi
+fi
+
+# Warn if settings file is missing
 if [ ! -f "$SETTINGS_FILE" ]; then
   echo -e "${YELLOW}Warning: $SETTINGS_FILE not found${NC}"
   echo -e "${YELLOW}Claude may prompt for permissions and block autonomous execution.${NC}"
@@ -115,47 +184,54 @@ if [ ! -f "$SETTINGS_FILE" ]; then
   fi
 fi
 
+# ── Start ───────────────────────────────────────────────────────────────
+
 echo -e "${BOLD}Starting Ralph autonomous agent${NC}"
-echo "════════════════════════════════════════════════════════════════"
+echo "================================================================"
 echo -e "  ${CYAN}Started:${NC}          $(timestamp)"
 echo -e "  ${CYAN}Max iterations:${NC}   $ITERATIONS"
 echo -e "  ${CYAN}Incomplete tasks:${NC} $INCOMPLETE_TASKS"
 echo -e "  ${CYAN}Prompt file:${NC}      $PROMPT_FILE"
-echo -e "  ${CYAN}Plan file:${NC}        $PLAN_FILE"
-echo "════════════════════════════════════════════════════════════════"
+echo -e "  ${CYAN}Spec file:${NC}        $SPEC_FILE"
+echo -e "  ${CYAN}Activity file:${NC}    $ACTIVITY_FILE"
+echo "================================================================"
 echo ""
 
 TOTAL_START_TIME=$(date +%s)
 COMPLETED_ITERATIONS=0
+FAILED_ITERATIONS=0
 
 for ((i=1; i<=ITERATIONS; i++)); do
   ITER_START_TIME=$(date +%s)
 
-  echo -e "${BOLD}${GREEN}▶ Iteration $i of $ITERATIONS${NC}"
-  echo -e "${DIM}────────────────────────────────────────────────────────────────${NC}"
+  echo -e "${BOLD}${GREEN}>> Iteration $i of $ITERATIONS${NC}"
+  echo -e "${DIM}----------------------------------------------------------------${NC}"
   echo -e "  ${BLUE}Started:${NC} $(timestamp)"
 
   # Show current incomplete task count
-  if [ -f "$PLAN_FILE" ]; then
-    CURRENT_INCOMPLETE=$(grep -c '"passes": false' "$PLAN_FILE" 2>/dev/null || echo "0")
-    echo -e "  ${BLUE}Remaining tasks:${NC} $CURRENT_INCOMPLETE"
+  CURRENT_INCOMPLETE=$(grep -c '"passes": false' "$SPEC_FILE" 2>/dev/null || echo "0")
+  echo -e "  ${BLUE}Remaining tasks:${NC} $CURRENT_INCOMPLETE"
+
+  # Early exit if no tasks remain
+  if [ "$CURRENT_INCOMPLETE" -eq 0 ]; then
+    echo -e "${GREEN}  No incomplete tasks remain — stopping early.${NC}"
+    break
   fi
   echo ""
 
-  # Run Claude with permission skip for autonomous operation
+  # Run Claude in print mode with permissions skipped for autonomous operation
   set +e
   result_json=$(claude -p "$(cat "$PROMPT_FILE")" --output-format json --dangerously-skip-permissions 2>&1)
   exit_code=$?
   set -e
 
   # Parse JSON output to extract result and usage
-  if command -v jq &> /dev/null && echo "$result_json" | jq -e . &> /dev/null; then
+  if [ "$HAS_JQ" = true ] && echo "$result_json" | jq -e . &> /dev/null 2>&1; then
     result=$(echo "$result_json" | jq -r '.result // empty')
     INPUT_TOKENS=$(echo "$result_json" | jq -r '.input_tokens // 0')
     OUTPUT_TOKENS=$(echo "$result_json" | jq -r '.output_tokens // 0')
     TOTAL_TOKENS=$((INPUT_TOKENS + OUTPUT_TOKENS))
   else
-    # Fallback if not valid JSON (e.g., error message)
     result="$result_json"
     INPUT_TOKENS=0
     OUTPUT_TOKENS=0
@@ -165,13 +241,13 @@ for ((i=1; i<=ITERATIONS; i++)); do
   ITER_END_TIME=$(date +%s)
   ITER_DURATION=$((ITER_END_TIME - ITER_START_TIME))
 
-  # Calculate response stats
+  # Response stats
   RESPONSE_LINES=$(echo "$result" | wc -l | tr -d ' ')
   RESPONSE_CHARS=$(echo "$result" | wc -c | tr -d ' ')
 
-  echo -e "${DIM}─── Claude Response ───${NC}"
+  echo -e "${DIM}--- Claude Response ---${NC}"
   echo "$result"
-  echo -e "${DIM}─── End Response ───${NC}"
+  echo -e "${DIM}--- End Response ---${NC}"
   echo ""
 
   # Iteration summary
@@ -185,13 +261,11 @@ for ((i=1; i<=ITERATIONS; i++)); do
     echo ""
     echo -e "  ${BOLD}Context Usage${NC}"
 
-    # Calculate percentages (assuming 200k context window)
     CONTEXT_WINDOW=200000
     USAGE_PERCENT=$((TOTAL_TOKENS * 100 / CONTEXT_WINDOW))
     INPUT_PERCENT=$((INPUT_TOKENS * 100 / CONTEXT_WINDOW))
     OUTPUT_PERCENT=$((OUTPUT_TOKENS * 100 / CONTEXT_WINDOW))
 
-    # Format token counts (k notation for thousands)
     if [ "$INPUT_TOKENS" -ge 1000 ]; then
       INPUT_DISPLAY="$((INPUT_TOKENS / 1000)).$((INPUT_TOKENS % 1000 / 100))k"
     else
@@ -208,56 +282,60 @@ for ((i=1; i<=ITERATIONS; i++)); do
       TOTAL_DISPLAY="$TOTAL_TOKENS"
     fi
 
-    # Build visual bar (10 segments)
+    # Visual bar (10 segments)
     FILLED_SEGMENTS=$((USAGE_PERCENT / 10))
     if [ "$FILLED_SEGMENTS" -gt 10 ]; then FILLED_SEGMENTS=10; fi
     EMPTY_SEGMENTS=$((10 - FILLED_SEGMENTS))
 
     BAR=""
-    for ((s=0; s<FILLED_SEGMENTS; s++)); do BAR+="⛁ "; done
-    for ((s=0; s<EMPTY_SEGMENTS; s++)); do BAR+="⛶ "; done
+    for ((s=0; s<FILLED_SEGMENTS; s++)); do BAR+="# "; done
+    for ((s=0; s<EMPTY_SEGMENTS; s++)); do BAR+="- "; done
 
-    echo -e "  ${DIM}$BAR${NC}  ${TOTAL_DISPLAY}/200k tokens (${USAGE_PERCENT}%)"
-    echo -e "  ${DIM}⛁${NC} Input:  ${INPUT_DISPLAY} tokens (${INPUT_PERCENT}%)"
-    echo -e "  ${DIM}⛁${NC} Output: ${OUTPUT_DISPLAY} tokens (${OUTPUT_PERCENT}%)"
+    echo -e "  [${BAR}]  ${TOTAL_DISPLAY}/200k tokens (${USAGE_PERCENT}%)"
+    echo -e "  Input:  ${INPUT_DISPLAY} tokens (${INPUT_PERCENT}%)"
+    echo -e "  Output: ${OUTPUT_DISPLAY} tokens (${OUTPUT_PERCENT}%)"
   fi
 
-  # Check for completion signal
+  # Check for completion signal (all tasks done)
   if [[ "$result" == *"<promise>COMPLETE</promise>"* ]]; then
     COMPLETED_ITERATIONS=$i
     TOTAL_END_TIME=$(date +%s)
     TOTAL_DURATION=$((TOTAL_END_TIME - TOTAL_START_TIME))
 
     echo ""
-    echo -e "${BOLD}${GREEN}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${BOLD}${GREEN}✓ ALL TASKS COMPLETE${NC}"
-    echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BOLD}${GREEN}================================================================${NC}"
+    echo -e "${BOLD}${GREEN}ALL TASKS COMPLETE${NC}"
+    echo -e "${GREEN}================================================================${NC}"
     echo -e "  ${CYAN}Finished:${NC}    $(timestamp)"
     echo -e "  ${CYAN}Iterations:${NC}  $i of $ITERATIONS"
     echo -e "  ${CYAN}Total time:${NC}  $(format_duration $TOTAL_DURATION)"
     exit 0
   fi
 
-  # Warn if Claude exited with error
+  # Track success/failure
   if [ $exit_code -ne 0 ]; then
-    echo -e "  ${YELLOW}⚠ Warning: Claude exited with non-zero code${NC}"
+    echo -e "  ${YELLOW}Warning: Claude exited with non-zero code ($exit_code)${NC}"
+    FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
   fi
 
-  # Check if task was likely completed (look for commit message in output)
-  if [[ "$result" == *"git commit"* ]] || [[ "$result" == *"[ankapetanovic-refactoring"* ]]; then
-    echo -e "  ${GREEN}✓ Task appears to have been committed${NC}"
+  # Check if a Ralph commit was made this iteration
+  LATEST_COMMIT_MSG=$(git log -1 --pretty=format:"%s" 2>/dev/null || echo "")
+  if [[ "$LATEST_COMMIT_MSG" == Ralph* ]]; then
+    echo -e "  ${GREEN}Committed: $LATEST_COMMIT_MSG${NC}"
+  else
+    echo -e "  ${YELLOW}Warning: no Ralph commit detected for this iteration${NC}"
   fi
 
   COMPLETED_ITERATIONS=$i
 
   echo ""
-  echo -e "${DIM}════════════════════════════════════════════════════════════════${NC}"
+  echo -e "${DIM}================================================================${NC}"
   echo ""
 
-  # Small delay between iterations to avoid rate limiting
+  # Delay between iterations to avoid rate limiting
   if [ $i -lt $ITERATIONS ]; then
-    echo -e "${DIM}Waiting 1s before next iteration...${NC}"
-    sleep 1
+    echo -e "${DIM}Waiting ${DELAY_BETWEEN_ITERATIONS}s before next iteration...${NC}"
+    sleep "$DELAY_BETWEEN_ITERATIONS"
     echo ""
   fi
 done
@@ -266,22 +344,20 @@ TOTAL_END_TIME=$(date +%s)
 TOTAL_DURATION=$((TOTAL_END_TIME - TOTAL_START_TIME))
 
 # Final status
-if [ -f "$PLAN_FILE" ]; then
-  FINAL_INCOMPLETE=$(grep -c '"passes": false' "$PLAN_FILE" 2>/dev/null || echo "0")
-  TASKS_COMPLETED=$((INCOMPLETE_TASKS - FINAL_INCOMPLETE))
-else
-  FINAL_INCOMPLETE="?"
-  TASKS_COMPLETED="?"
-fi
+FINAL_INCOMPLETE=$(grep -c '"passes": false' "$SPEC_FILE" 2>/dev/null || echo "0")
+TASKS_COMPLETED=$((INCOMPLETE_TASKS - FINAL_INCOMPLETE))
 
-echo -e "${BOLD}${YELLOW}════════════════════════════════════════════════════════════════${NC}"
-echo -e "${BOLD}${YELLOW}⚠ REACHED MAX ITERATIONS${NC}"
-echo -e "${YELLOW}════════════════════════════════════════════════════════════════${NC}"
-echo -e "  ${CYAN}Finished:${NC}         $(timestamp)"
-echo -e "  ${CYAN}Iterations run:${NC}   $COMPLETED_ITERATIONS of $ITERATIONS"
-echo -e "  ${CYAN}Total time:${NC}       $(format_duration $TOTAL_DURATION)"
-echo -e "  ${CYAN}Tasks completed:${NC}  $TASKS_COMPLETED"
-echo -e "  ${CYAN}Tasks remaining:${NC}  $FINAL_INCOMPLETE"
+echo -e "${BOLD}${YELLOW}================================================================${NC}"
+echo -e "${BOLD}${YELLOW}REACHED MAX ITERATIONS${NC}"
+echo -e "${YELLOW}================================================================${NC}"
+echo -e "  ${CYAN}Finished:${NC}           $(timestamp)"
+echo -e "  ${CYAN}Iterations run:${NC}     $COMPLETED_ITERATIONS of $ITERATIONS"
+echo -e "  ${CYAN}Failed iterations:${NC}  $FAILED_ITERATIONS"
+echo -e "  ${CYAN}Total time:${NC}         $(format_duration $TOTAL_DURATION)"
+echo -e "  ${CYAN}Tasks completed:${NC}    $TASKS_COMPLETED"
+echo -e "  ${CYAN}Tasks remaining:${NC}    $FINAL_INCOMPLETE"
 echo ""
-echo -e "Run ${BOLD}./ralph.sh $FINAL_INCOMPLETE${NC} to complete remaining tasks."
+if [ "$FINAL_INCOMPLETE" -gt 0 ]; then
+  echo -e "Run ${BOLD}./ralph.sh $FINAL_INCOMPLETE${NC} to complete remaining tasks."
+fi
 exit 1

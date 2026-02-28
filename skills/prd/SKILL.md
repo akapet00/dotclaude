@@ -1,38 +1,40 @@
 ---
 name: prd
-description: "Generate a Product Requirements Document (PRD) for a new feature, task, experiment or research. Use during the planning, starting a new project, refactoring, developing research code, code testing, or simply when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, plan the experiment, plan the refactoring, write requirements for, spec out, etc."
+description: "Generate a Product Requirements Document (PRD) for a new feature, task, experiment or research. Use during the planning, starting a new project, refactoring, developing research code, code testing, or simply when asked to create a PRD. Either written from scratch with user input only or with user input and existing PLAN.md. Triggers on: create a prd, write prd for, plan this feature, plan the experiment, plan the refactoring, write requirements for, spec out, etc."
 ---
 
-# PRD Generator
+# PRD GENERATOR
 
-Create detailed PRD that is clear, actionable, and suitable for implementation.
+Create a detailed PRD that is clear, actionable, and suitable for implementation.
 
 ---
 
 ## The Job
 
-1. Receive a task description from the user
-2. Ask 3 to 5 essential clarifying questions (with lettered options) if necessary
-3. Generate a structured PRD based on answers
-4. Save to `PRD.md` if user doesn't tell you differently.
+1. Receive a task description from the user (with or without existing `PLAN.md` file)
+2. Ask only the critical clarifying questions needed to resolve ambiguity
+3. Incorporate the user's answers into the plan
+4. Generate a structured PRD based on the combined input
+5. Save to `PRD.md` unless the user specifies a different filename or location
 
 **Important:**
-- DO NOT implement code
+- DO NOT implement anything in this phase
 - Keep your focus on PLANNING, STRUCTURE, and EVALUATION
+- This skill produces a PRD only — downstream conversion into executable tasks is a separate concern
 
 ---
 
 ## Step 1: Clarifying Questions
 
-Ask only critical questions where the initial prompt is ambiguous. Focus on:
+Ask only critical questions where the initial prompt is ambiguous. Skip questions whose answers are obvious from context. Focus on:
 
-- **Objective:** What question are we answering?
+- **Objective:** What problem are we solving or what question are we answering?
 - **Methodology:** What type of approach is expected?
 - **Artifacts:** What outputs are required?
 - **Evaluation:** How will results be assessed?
 - **Constraints:** Time, compute, data, or tooling limits
 
-**Example Questions Format (Adjust a Set of Questions for a Specific Problem):**
+**Example Questions Format (Adjust the set of questions for the specific problem):**
 
 ```
 1. What is the primary objective of this task?
@@ -68,7 +70,18 @@ This lets users respond with "1A, 2C, 3B" for quick iteration.
 
 ---
 
-## Step 2: PRD Structure
+## Step 2: Incorporate Answers
+
+Before generating the PRD:
+
+1. Map each user answer to the relevant PRD section
+2. Resolve any contradictions between the initial prompt and the answers
+3. If critical ambiguity remains after the first round, ask ONE follow-up round (no more)
+4. If the user provides a `PLAN.md`, merge its content with the clarifying answers — the PRD should reflect both
+
+---
+
+## Step 3: Generate the PRD
 
 Generate the PRD with these sections:
 
@@ -87,6 +100,7 @@ Concrete, testable objectives. Use bullet points. Avoid vague goals like "improv
 - Test the code so that the coverage is at least 80 percent
 
 ### 3. Research Questions / Hypotheses (Optional)
+
 For purely research-focused tasks. List explicit research questions or hypotheses.
 
 **Example:**
@@ -95,7 +109,13 @@ For purely research-focused tasks. List explicit research questions or hypothese
 
 ### 4. User Stories
 
-Atomic work unit written in markdown format that should be **small enough to complete in one focused session**:
+Atomic work units written in markdown format. Each user story must be:
+
+- **Small enough to complete in one focused coding session** (a single context window for an autonomous agent, or a focused human work block). If you cannot describe the change in 2-3 sentences, split the story.
+- **Self-contained** — solvable with zero memory of how other stories were implemented. The story may depend on _outputs_ of prior stories (files, functions, schemas), but never on _knowledge_ of how they were built.
+- **Independently verifiable** — acceptance criteria can be checked without running any other story first.
+
+Template:
 ```markdown
 - **Title:** Short descriptive name
 - **Priority:** P0 (Critical) | P1 (High) | P2 (Medium) | P3 (Low)
@@ -129,15 +149,17 @@ Template C: Refactoring / Testing
 - [ ] Test coverage meets target (specify %)
 - [ ] All tests pass
 - [ ] Code complexity reduced or maintained
-- [ ] Type hints added/updated where applicable
+- [ ] Type hints / type annotations added/updated where applicable
 ```
 
 **Important:**
 - Acceptance criteria must be **verifiable**, not subjective.
-- Each use story has to be **stand alone**, and it should be possible to solve it with a fresh context.
+- Each user story must be **stand-alone** — solvable with a fresh context and no memory of prior sessions.
+- Order stories so that earlier stories never depend on later ones.
 
 ### 5. Functional Requirements
-Explicit, numbered requirements describing **what the code must solve**.
+
+Explicit, numbered requirements describing **what the code must do**.
 
 Examples:
 - FR-1: Load dataset version `vX.Y` with deterministic preprocessing
@@ -146,6 +168,7 @@ Examples:
 - FR-4: Enable ablation of feature groups via config flags
 
 ### 6. Non-Goals (Out of Scope)
+
 What this feature will NOT include. Critical for managing scope.
 
 Examples:
@@ -170,11 +193,13 @@ This is **CRITICAL** for avoiding scope creep.
 - Potential blockers and contingency plans
 
 ### 8. Technical Considerations (Optional)
+
 - Known constraints or dependencies
 - Integration points with existing systems
 - Performance requirements
 
 ### 9. Success Metrics
+
 How will success be measured?
 
 May include:
@@ -183,8 +208,22 @@ May include:
 - Qualitative inspection (plots, embeddings, examples)
 - Engineering metrics (runtime, code coverage, linting)
 
-### 10. Open Questions
-Remaining questions or areas needing clarification.
+### 10. Open Questions (Optional)
+
+Remaining questions or areas needing clarification, which can be left for the user to answer in later stages (avoid if possible).
+
+---
+
+## Handling Existing PRDs
+
+When a `PRD.md` already exists in the project:
+
+1. **Read it first.** Understand the current scope and structure.
+2. **Ask the user what they want:** update, extend, or replace.
+3. **If updating:** preserve unchanged sections, apply edits surgically, and note what changed at the top of the file (e.g., `<!-- Updated: YYYY-MM-DD — added user story for caching -->`).
+4. **If replacing:** generate a fresh PRD and overwrite.
+
+Never silently overwrite an existing PRD without confirmation.
 
 ---
 
@@ -258,12 +297,12 @@ The training pipeline currently runs for a fixed number of epochs, wasting compu
 # PRD: Refactor Database Access Layer
 
 ## 1. Introduction/Overview
-The current database access code is scattered across multiple modules with duplicated queries, no type hints, and minimal test coverage. This refactor consolidates database operations into a repository pattern, improves type safety, and increases test coverage to support future feature development.
+The current database access code is scattered across multiple modules with duplicated queries, no type annotations, and minimal test coverage. This refactor consolidates database operations into a repository pattern, improves type safety, and increases test coverage to support future feature development.
 
 ## 2. Goals
 - Consolidate all database queries into repository classes
 - Achieve 80% test coverage on database layer
-- Add type hints to all public interfaces
+- Add type annotations to all public interfaces
 - Reduce code duplication by 50%+
 
 ## 3. Research Questions / Hypotheses (Optional)
@@ -279,17 +318,17 @@ N/A - this is a refactoring task.
     - [ ] All tests pass
     - [ ] UserRepository, ProjectRepository, TaskRepository created
     - [ ] No raw SQL queries outside repository classes
-    - [ ] Type hints added/updated where applicable
+    - [ ] Type annotations added/updated where applicable
 
-- **Title:** Add type hints to public interfaces
+- **Title:** Add type annotations to public interfaces
 - **Priority:** P1 (High)
-- **Description:** "As a developer, I want type hints on all repository methods so that I catch type errors at development time"
+- **Description:** "As a developer, I want type annotations on all repository methods so that I catch type errors at development time"
 - **Acceptance Criteria:**
     - [ ] Existing behavior preserved (no regressions)
     - [ ] All tests pass
-    - [ ] All public methods have input/output type hints
-    - [ ] mypy passes with no errors
-    - [ ] Type hints added/updated where applicable
+    - [ ] All public methods have input/output type annotations
+    - [ ] Type checker passes with no errors
+    - [ ] Type annotations added/updated where applicable
 
 - **Title:** Increase test coverage to 80%
 - **Priority:** P2 (Medium)
@@ -314,8 +353,8 @@ N/A - this is a refactoring task.
 ## 5. Functional Requirements
 - FR-1: Create base Repository class with common CRUD operations
 - FR-2: Implement UserRepository, ProjectRepository, TaskRepository
-- FR-3: Add type hints using typing module (no third-party dependencies)
-- FR-4: Write unit tests using pytest with fixtures
+- FR-3: Add type annotations to all public interfaces
+- FR-4: Write unit tests with fixtures
 - FR-5: Support connection pooling with configurable pool size (default=5)
 
 ## 6. Non-Goals (Out of Scope)
@@ -326,14 +365,14 @@ N/A - this is a refactoring task.
 
 ## 7. Dependencies & Risks
 **Dependencies:**
-- pytest and pytest-cov for testing
-- mypy for type checking
+- Test framework and coverage tool
+- Type checker for the project's language
 - Existing database schema (no migrations)
 
 **Risks & Mitigations:**
 - Risk: Breaking existing functionality during refactor
 - Mitigation: Write characterization tests before refactoring
-- Risk: Type hints may reveal existing bugs
+- Risk: Type annotations may reveal existing bugs
 - Mitigation: Track and address separately, don't block refactor
 
 ## 8. Technical Considerations (Optional)
@@ -342,12 +381,12 @@ N/A - this is a refactoring task.
 
 ## 9. Success Metrics
 - All existing tests pass after refactor
-- Test coverage >= 80% on src/repositories/
-- mypy reports 0 errors
+- Test coverage >= 80% on repository layer
+- Type checker reports 0 errors
 - No raw SQL queries outside repository classes
 
 ## 10. Open Questions
-- Should repositories return domain objects or dicts?
+- Should repositories return domain objects or dicts/maps?
 - Do we need a separate integration test suite?
 ```
 
@@ -357,9 +396,8 @@ N/A - this is a refactoring task.
 
 The reader may be:
 - A future version of yourself
-- A collaborator
-- An AI coding agent
-
+- A human collaborator
+- Any AI coding agent
 
 Therefore:
 - Be explicit and concrete
@@ -373,8 +411,8 @@ Therefore:
 ## Output
 
 - **Format:** Markdown (`.md`)
-- **Location:** `.`
-- **Filename:** `PRD.md`
+- **Location:** Project root (`.`)
+- **Filename:** `PRD.md` (unless user specifies otherwise)
 
 ---
 
@@ -382,9 +420,11 @@ Therefore:
 
 Before saving the PRD:
 
-- [ ] Asked clarifying questions with lettered options
-- [ ] Incorporated user's answers
-- [ ] Stories are small and specific
+- [ ] Asked clarifying questions (or confirmed none were needed)
+- [ ] Incorporated user's answers into every relevant section
+- [ ] Each user story is small, specific, self-contained, and independently verifiable
+- [ ] User stories are ordered so earlier stories never depend on later ones
 - [ ] Functional requirements are numbered and unambiguous
 - [ ] Non-goals section defines clear boundaries
+- [ ] If a PRD already existed, confirmed with user before overwriting
 - [ ] Saved to `PRD.md`

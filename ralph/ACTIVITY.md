@@ -1,15 +1,24 @@
 # Activity
 
-Append activity log at bottom. Follow the template:
+Session log for Ralph iterations. Each session appends one entry at the bottom after completing (or failing) its task.
+
+**Template:**
 
 ```markdown
-### Current atetime in YYYY-MM-DD HH:MM format for Central European Timezone (use tools)
+### YYYY-MM-DD HH:MM
 
-**Tasks completed:** Tasks that are already completed; take ID and description from @SPEC.md.
+**Task:** [ID] — [Title from SPEC.md]
 
-**Current tasks:** Task that is implemented in the current instance; take description from @SPEC.md.
+**Status:** Completed | Failed | Partially completed
 
-**Blockers:** Issues encountered.
+**What was done:**
+- [Concrete bullet points of changes made]
+
+**Blockers:** [Any issues encountered, or "None"]
+
+**Notes for next session:** [Anything the next iteration needs to know, or "None"]
 ```
+
+---
 
 ## Session Log
