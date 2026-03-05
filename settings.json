@@ -18,5 +18,9 @@
       "Read(./.secrets/**)"
     ]
   },
-  "model": "opus"
+  "model": "opus",
+  "skipDangerousModePermissionPrompt": true,
+  "enabledPlugins": {
+    "skill-creator@claude-plugins-official": true
+  }
 }

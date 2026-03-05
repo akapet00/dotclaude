@@ -1,0 +1,26 @@
+{
+  "_comment": "Template for autonomous Ralph execution. Copy to .claude/settings.local.json and customize.",
+
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint)",
+      "Bash(npm run test:*)",
+      "Read(~/.zshrc)",
+
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git status *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(/.env.*)",
+      "Read(./.secrets/**)",
+
+      "Bash(git push *)",
+      "Bash(rm -rf *)",
+      "Bash(sudo *)"
+    ]
+  }
+}

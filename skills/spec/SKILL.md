@@ -14,6 +14,7 @@ Either written from scratch or converted from existing PRDs into `SPEC.md` — a
 Write from scratch (use user's input and/or PLAN) or take a PRD (usually `PRD.md` in the project root) and convert it to `SPEC.md` in the project root.
 
 **Key constraint:** Each task in the spec will be executed by a fresh agent session that has ONLY these sources of context:
+- `CLAUDE.md` — project-specific conventions, commands, and patterns (if it exists)
 - The full `SPEC.md` file
 - An `ACTIVITY.md` log from previous sessions
 - The `PROMPT.md` instructions
@@ -55,20 +56,19 @@ Check that the PRD contains the required sections:
 
 ## Step 3: Discover Project Commands
 
-Before writing the SPEC, inspect the project to determine the correct commands for linting, type checking, testing, and running. Check these sources:
+Before writing the SPEC, determine the correct commands for linting, type checking, testing, and running. Use this priority order:
 
-- `pyproject.toml` — look for `[tool.ruff]`, `[tool.ty]`, `[tool.pytest]`, `[project.scripts]`
-- `Makefile` — targets like `lint`, `test`, `check`, `run`
-- `.github/workflows/*.yml` — CI steps often reveal the canonical commands
-- `README.md` — often documents how to run, test, and lint
+1. **Check `CLAUDE.md`** (project root) — if it exists and lists commands under a "Commands" section, use them. This is the authoritative source maintained by the project owner.
+2. **Inspect project files** — look for commands in:
+   - `pyproject.toml` — `[tool.ruff]`, `[tool.pytest]`, `[project.scripts]`
+   - `package.json` — `scripts` section
+   - `Makefile` — targets like `lint`, `test`, `check`, `run`
+   - `Cargo.toml`, `go.mod`, or other language-specific config
+   - `.github/workflows/*.yml` — CI steps often reveal the canonical commands
+   - `README.md` — often documents how to run, test, and lint
+3. **Ask the user** — if commands cannot be determined from the above, ask rather than guessing. If the user provides commands verbally but no `CLAUDE.md` exists, suggest they create one for future sessions.
 
-Defaults (when using `uv`):
-- Linting: `uv run ruff check .`
-- Type checking: `uv run ty src/`
-- Tests: `uv run pytest tests/`
-- Run: `uv run python main.py`
-
-If you cannot determine a command, use a placeholder: `# TODO: determine [linting/test/...] command`.
+If you cannot determine a command after all sources, use a placeholder: `# TODO: determine [linting/test/...] command`.
 
 ---
 
@@ -127,6 +127,8 @@ For Functional Requirements without User Stories:
 | Code with tests | `"All tests pass"` |
 | ML/Research | `"Results logged and reproducible"` |
 | Refactoring | `"Existing tests pass (no regressions)"` |
+
+The executing agent finds the exact commands for these verification steps in the **Notes** section at the bottom of SPEC.md. When writing verification steps, use wording that clearly maps to the commands listed there (e.g., "Typecheck passes" maps to the type checking command in Notes, "All tests pass" maps to the test command).
 
 ---
 
@@ -244,6 +246,15 @@ It does NOT receive:
 - "Build the entire pipeline" -> Split into: config, data loading, processing stages, evaluation
 - "Add experiment tracking" -> Split into: config schema, logging functions, metrics collection, output formatting
 - "Refactor the codebase" -> Split into one task per module or pattern
+
+### Complexity signals — when to split further
+
+A task may look small in description but be expensive in context. Watch for:
+
+- **Touches more than 3-4 files** — the agent needs to read and understand each one
+- **Requires cross-module understanding** — e.g., "refactor how auth works across the API, middleware, and database layers"
+- **Combines implementation and testing** — consider separating the implementation task from its test task
+- **Needs broad codebase exploration** — if the agent must search widely to understand where to make changes, the exploration alone may consume most of the context window
 
 **Rule of thumb:** If you cannot describe the change in 2-3 sentences, split it.
 

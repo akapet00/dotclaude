@@ -11,8 +11,10 @@ Portable, git-backed configuration for Claude Code. Copy into a project's `.clau
 | `ralph/PROMPT.md` | `PROMPT.md` in project root | Customize the `[placeholders]` for your project |
 | `ralph/ralph.sh` | `ralph.sh` in project root | The loop script |
 | `ralph/ACTIVITY.md` | `ACTIVITY.md` in project root | Session log — lives next to SPEC.md |
+| `ralph/CLAUDE.md` | `CLAUDE.md` in project root | Project-specific agent instructions — seed before first run |
+| `ralph/settings.ralph.json` | `.claude/settings.local.json` | Permission restrictions for autonomous execution |
 
-The `ralph/` directory in this repo is only for organization. When deploying to a project, all Ralph files (`ralph.sh`, `PROMPT.md`, `ACTIVITY.md`) go into the **project root** alongside `SPEC.md`.
+The `ralph/` directory in this repo is only for organization. When deploying to a project, all Ralph files (`ralph.sh`, `PROMPT.md`, `ACTIVITY.md`, `CLAUDE.md`) go into the **project root** alongside `SPEC.md`.
 
 ## Ralph
 
@@ -59,6 +61,44 @@ User input / PLAN.md
 ```
 
 Requires `claude` CLI, `git`, and optionally `jq` for token stats. Uses `--dangerously-skip-permissions` for autonomous operation — configure `.claude/settings.local.json` with appropriate permissions first.
+
+## Sandboxing
+
+Ralph runs with `--dangerously-skip-permissions`, which means the agent can execute arbitrary shell commands, modify any file, and install packages without confirmation. Use Claude Code's built-in sandbox and permission settings to limit the blast radius.
+
+### Permission settings
+
+Configure `.claude/settings.local.json` to restrict what Ralph can do. See `ralph/settings.ralph.json` for a template that:
+
+- Allows git, lint, and test commands needed for the loop
+- Blocks destructive operations (`rm -rf`, `sudo`, `git push`)
+- Denies access to secrets and environment files
+
+Customize the `allow` list with your project's actual commands before the first run.
+
+### Built-in sandbox
+
+Claude Code also has a built-in sandbox (macOS, Linux, WSL2) that isolates bash commands at the filesystem and network level. You can enable it in settings:
+
+```json
+{
+  "sandbox": {
+    "enabled": true,
+    "filesystem": {
+      "denyWrite": ["//etc", "//usr/local/bin", "~/.ssh/**"]
+    },
+    "network": {
+      "allowedDomains": ["github.com", "pypi.org", "files.pythonhosted.org", "*.npmjs.org"]
+    }
+  }
+}
+```
+
+### Additional isolation
+
+For stronger isolation, run Ralph inside Docker, a dev container, or a cloud sandbox ([E2B](https://e2b.dev), [Fly Machines](https://fly.io/docs/machines/)).
+
+At minimum, run Ralph in a **dedicated branch** and review diffs before merging.
 
 ## License
 

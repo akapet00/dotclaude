@@ -111,8 +111,8 @@ For purely research-focused tasks. List explicit research questions or hypothese
 
 Atomic work units written in markdown format. Each user story must be:
 
-- **Small enough to complete in one focused coding session** (a single context window for an autonomous agent, or a focused human work block). If you cannot describe the change in 2-3 sentences, split the story.
-- **Self-contained** — solvable with zero memory of how other stories were implemented. The story may depend on _outputs_ of prior stories (files, functions, schemas), but never on _knowledge_ of how they were built.
+- **Completable in a single autonomous session** — sized so that one agent (or one focused human work block) can finish it in a single fresh context window with zero memory of prior sessions. If you cannot describe the change in 2-3 sentences, split the story.
+- **Self-contained** — solvable with no knowledge of how other stories were implemented. The story may depend on _outputs_ of prior stories (files, functions, schemas that exist in the codebase), but never on _knowledge_ of how they were built. An agent starting from scratch must be able to pick up this story by reading the codebase and the story's description alone.
 - **Independently verifiable** — acceptance criteria can be checked without running any other story first.
 
 Template:
@@ -150,6 +150,15 @@ Template C: Refactoring / Testing
 - [ ] All tests pass
 - [ ] Code complexity reduced or maintained
 - [ ] Type hints / type annotations added/updated where applicable
+```
+
+Template D: Research & Analysis
+```markdown
+- [ ] Literature or data sources reviewed and documented
+- [ ] Methodology described and justified
+- [ ] Statistical rigor applied where applicable (significance tests, confidence intervals)
+- [ ] Results reproducible from documented steps
+- [ ] Artifacts saved (datasets, notebooks, figures, reports)
 ```
 
 **Important:**
