@@ -7,6 +7,7 @@ Portable, git-backed configuration for Claude Code. Copy into a project's `.clau
 | Source | Destination | Notes |
 |--------|-------------|-------|
 | `settings.json` | `.claude/settings.json` | Or `.claude/settings.local.json` for local overrides |
+| `statusline-command.sh` | `.claude/statusline-command.sh` | Shows model being used and context-window usage |
 | `skills/` | `.claude/skills/` | Skills are loaded automatically by Claude Code |
 | `ralph/PROMPT.md` | `PROMPT.md` in project root | Customize the `[placeholders]` for your project |
 | `ralph/ralph.sh` | `ralph.sh` in project root | The loop script |
