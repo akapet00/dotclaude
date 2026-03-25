@@ -14,6 +14,8 @@ Portable, git-backed configuration for Claude Code. Copy into a project's `.clau
 | `ralph/ACTIVITY.md` | `ACTIVITY.md` in project root | Session log — lives next to SPEC.md |
 | `ralph/CLAUDE.md` | `CLAUDE.md` in project root | Project-specific agent instructions — seed before first run |
 | `ralph/settings.ralph.json` | `.claude/settings.local.json` | Permission restrictions for autonomous execution |
+| `CLAUDE.md` | `~/.claude/CLAUDE.md` | Global instructions applied to all projects |
+| `tropes.md` | `~/.claude/tropes.md` | AI writing tropes to avoid ([source](https://tropes.fyi/tropes-md) by [ossama.is](https://ossama.is)) |
 
 The `ralph/` directory in this repo is only for organization. When deploying to a project, all Ralph files (`ralph.sh`, `PROMPT.md`, `ACTIVITY.md`, `CLAUDE.md`) go into the **project root** alongside `SPEC.md`.
 
