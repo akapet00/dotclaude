@@ -19,6 +19,14 @@ Portable, git-backed configuration for Claude Code. Copy into a project's `.clau
 
 The `ralph/` directory in this repo is only for organization. When deploying to a project, all Ralph files (`ralph.sh`, `PROMPT.md`, `ACTIVITY.md`, `CLAUDE.md`) go into the **project root** alongside `SPEC.md`.
 
+## Skills
+
+| Skill | Description |
+|-------|-------------|
+| `/prd` | Generate a product requirements document (`PRD.md`) from user input |
+| `/spec` | Convert `PRD.md` into a sovereign task list (`SPEC.md`) for Ralph |
+| `/scholar` | Search, analyze, and export academic papers via Semantic Scholar API |
+
 ## Ralph
 
 Ralph is an autonomous agent loop built on top of [Claude Code's headless mode](https://docs.anthropic.com/en/docs/claude-code/cli-usage#headless-mode). It executes a task list (`SPEC.md`) one task at a time, where each task runs in a fresh Claude session with no memory of prior sessions.
