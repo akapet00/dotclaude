@@ -1,6 +1,7 @@
 ---
 name: prd
 description: "Generate a Product Requirements Document (PRD) for a new feature, task, experiment or research. Use during the planning, starting a new project, refactoring, developing research code, code testing, or simply when asked to create a PRD. Either written from scratch with user input only or with user input and existing PLAN.md. Triggers on: create a prd, write prd for, plan this feature, plan the experiment, plan the refactoring, write requirements for, spec out, etc."
+disable-model-invocation: true
 ---
 
 # PRD GENERATOR

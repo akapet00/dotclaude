@@ -1,6 +1,7 @@
 ---
 name: spec
 description: "Write a specification document - a set of user stories. Either written from scratch (with user input or PLAN.md) or translated from an existing PRD and need to create a task list for autonomous coding. Triggers on: write the spec, convert this plan, create specification from plan, convert this prd, create specification from prd, create spec from prd, turn prd into tasks."
+disable-model-invocation: true
 ---
 
 # SPECIFICATION DOCUMENT
