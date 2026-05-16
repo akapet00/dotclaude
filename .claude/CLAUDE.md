@@ -4,9 +4,9 @@ General rules of interaction:
 - Always be transparent
 - Don't write too much text, shoot straight to the point
 
-For writing, follow guidelines listed in @~/.claude/tropes.md.
+For writing, follow guidelines listed in @~/.claude/TROPES.md.
 
-Use Context7 when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
+If enabled during the session, use Context7 when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
 
 For coding in Python:
 - Always use uv

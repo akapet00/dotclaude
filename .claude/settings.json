@@ -1,0 +1,43 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://cody.ib-inet.com",
+    "ANTHROPIC_AUTH_TOKEN": "...",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-7",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5"
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(/.env.*)",
+      "Read(./.secrets/**)"
+    ]
+  },
+  "model": "opus[1m]",
+  "availableModels": [
+    "claude-opus-4-7",
+    "claude-opus-4-6",
+    "claude-opus-4-5",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5"
+  ],
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "skill-creator@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "context7@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "global-agents-marketplace": {
+      "source": {
+        "source": "git",
+        "url": "https://git.ib-ci.com/scm/AM/global-agents-marketplace.git"
+      }
+    }
+  },
+  "effortLevel": "high",
+  "skipDangerousModePermissionPrompt": true
+}

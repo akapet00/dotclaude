@@ -1,13 +1,13 @@
 # Activity
 
-Session log for Ralph iterations. Each session appends one entry at the bottom after completing (or failing) its task.
+Session log for loop iterations. Each session appends one entry at the bottom after completing (or failing) its task.
 
 **Template:**
 
 ```markdown
 ### YYYY-MM-DD HH:MM
 
-**Task:** [ID] — [Title from SPEC.md]
+**Task:** [ID] — [Title from TASKS.md]
 
 **Status:** Completed | Failed | Partially completed
 
